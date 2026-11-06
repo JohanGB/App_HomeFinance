@@ -10,6 +10,7 @@ hilo de sincronización, con `GoogleDriveGateway.from_credentials`.
 from __future__ import annotations
 
 import hashlib
+import pkgutil
 import socket
 import ssl
 from dataclasses import dataclass, field
@@ -18,7 +19,7 @@ from typing import Callable, Mapping, Protocol
 
 import httplib2
 from google.auth.exceptions import RefreshError, TransportError
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build, build_from_document
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
@@ -89,6 +90,20 @@ class DriveGateway(Protocol):
     def tag_environment(self, file_id: str, entorno_id: str) -> RemoteFile: ...
 
 
+def drive_discovery_document() -> str | None:
+    """Descripción de Drive v3 que trae la librería, leída también desde un .zip.
+
+    En Android, Flet empaqueta las librerías en `sitepackages.zip` y googleapiclient
+    intenta abrir ese archivo con `open()`, que falla dentro de un zip. `pkgutil` sí
+    lo lee. Sin el archivo, `build()` lo descarga de Google como siempre.
+    """
+    try:
+        data = pkgutil.get_data("googleapiclient.discovery_cache", "documents/drive.v3.json")
+    except (OSError, ValueError):
+        return None
+    return data.decode("utf-8") if data else None
+
+
 def md5_of(path: Path) -> str:
     digest = hashlib.md5(usedforsecurity=False)
     with path.open("rb") as handle:
@@ -131,6 +146,9 @@ class GoogleDriveGateway:
 
     @classmethod
     def from_credentials(cls, credentials) -> "GoogleDriveGateway":
+        document = drive_discovery_document()
+        if document:
+            return cls(build_from_document(document, credentials=credentials))
         return cls(build("drive", "v3", credentials=credentials, cache_discovery=False))
 
     def _run(self, request):
