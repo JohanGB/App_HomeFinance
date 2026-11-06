@@ -414,7 +414,10 @@ class FinanzasApp:
             fch.ScatterChartSpot(
                 x=t.clave, y=t.total_cent / 100, radius=6,
                 color=ft.Colors.with_opacity(0.8, SEED),
-                tooltip=fch.ScatterChartSpotTooltip(text=tooltip(t)),
+                tooltip=fch.ScatterChartSpotTooltip(
+                    text=tooltip(t),
+                    text_style=ft.TextStyle(color=ft.Colors.ON_INVERSE_SURFACE, size=12),
+                ),
             )
             for t in result.totals
         ]
@@ -427,6 +430,8 @@ class FinanzasApp:
             bottom = [(m, fmt.MONTH_INITIALS[m - 1]) for m in range(1, 13)]
         return fch.ScatterChart(
             spots=spots,
+            # Colores del tema invertido: claro sobre oscuro en modo claro y al revés.
+            tooltip=fch.ScatterChartTooltip(bgcolor=ft.Colors.INVERSE_SURFACE, border_radius=8),
             min_x=min_x, max_x=max_x, min_y=0, max_y=max_y,
             horizontal_grid_lines=fch.ChartGridLines(
                 interval=step, color=ft.Colors.with_opacity(0.12, ft.Colors.ON_SURFACE), width=1
@@ -622,7 +627,7 @@ class FinanzasApp:
                         f"sin detallar: {fmt.format_money(max(total_cents - item_cents, 0))}"
                     )
                     summary.color = ft.Colors.ON_SURFACE_VARIANT
-            summary.update() if summary.page else None
+            _refresh(summary)
 
         def add_item(e=None, nombre="", cantidad=1, valor=""):
             # Dos líneas por ítem: en un teléfono no caben cuatro campos en una fila.
@@ -651,8 +656,7 @@ class FinanzasApp:
                 tight=True,
             )
             items_col.controls.append(row)
-            if items_col.page:
-                items_col.update()
+            _refresh(items_col)
 
         if expense:
             for i in expense.items:
@@ -685,8 +689,7 @@ class FinanzasApp:
             category_chips.controls = [
                 ft.Chip(label=ft.Text(n), on_click=pick_category(n)) for n in names
             ]
-            if category_chips.page:
-                category_chips.update()
+            _refresh(category_chips)
 
         category.on_change = suggest_category
 
@@ -1060,8 +1063,7 @@ class FinanzasApp:
 
     def show_busy(self, value: bool) -> None:
         self.busy.visible = value
-        if self.busy.page:
-            self.busy.update()
+        _refresh(self.busy)
 
     def show_center(self, icon: ft.Control, title: str, text: str = "",
                     actions: list[ft.Control] | None = None) -> None:
@@ -1086,6 +1088,20 @@ class FinanzasApp:
                         expand=True)
         )
         self.page.update()
+
+
+def _refresh(control: ft.Control) -> None:
+    """Actualiza un control solo si ya está en pantalla.
+
+    En Flet 1.0, leer `control.page` antes de agregarlo lanza RuntimeError en vez de
+    devolver None; pasa al precargar los ítems de un gasto que se va a editar.
+    """
+    try:
+        mounted = control.page is not None
+    except RuntimeError:
+        mounted = False
+    if mounted:
+        control.update()
 
 
 def _nice_step(raw: float) -> float:
