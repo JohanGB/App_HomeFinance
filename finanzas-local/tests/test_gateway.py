@@ -159,3 +159,50 @@ def test_download_writes_all_chunks(tmp_path):
     )
     gw.download("1", dest)
     assert dest.read_bytes() == b"abcd"
+
+
+# ----------------------------------------------- librerías empaquetadas en un .zip
+import subprocess  # noqa: E402
+import sys  # noqa: E402
+import zipfile  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+
+def test_discovery_document_is_bundled():
+    from finanzas.services.drive_gateway import drive_discovery_document
+    document = json.loads(drive_discovery_document())
+    assert document["name"] == "drive" and document["version"] == "v3"
+
+
+def test_gateway_builds_when_googleapiclient_lives_in_a_zip(tmp_path):
+    """Reproduce el empaquetado de Android: googleapiclient dentro de sitepackages.zip."""
+    import googleapiclient
+    package = Path(googleapiclient.__file__).parent
+    archive = tmp_path / "sitepackages.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        for file in package.rglob("*"):
+            if file.is_file() and "__pycache__" not in file.parts:
+                zf.write(file, Path("googleapiclient") / file.relative_to(package))
+    src = Path(__file__).resolve().parents[1] / "src"
+    script = f"""
+import sys
+sys.path.insert(0, {str(archive)!r})
+sys.path.insert(1, {str(src)!r})
+import googleapiclient
+assert ".zip" in googleapiclient.__file__, googleapiclient.__file__
+from google.oauth2.credentials import Credentials
+from finanzas.services.drive_gateway import GoogleDriveGateway
+GoogleDriveGateway.from_credentials(Credentials(token="t"))
+from googleapiclient.discovery import build
+try:
+    build("drive", "v3", credentials=Credentials(token="t"), static_discovery=True)
+except Exception:
+    # Android lanza NotADirectoryError; Windows, UnknownApiNameOrVersion.
+    print("build-falla-en-zip")
+print("ok")
+"""
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert "ok" in result.stdout
+    # La forma anterior sí falla en el zip; la nueva no.
+    assert "build-falla-en-zip" in result.stdout
