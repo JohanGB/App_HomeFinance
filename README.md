@@ -8,7 +8,7 @@ equipo; Google Drive solo recibe una copia al cambiar de entorno o al cerrar la 
 Windows y la sincronización se probaron contra Google Drive real; Android todavía no se
 ha probado en un teléfono.
 
-![Pantalla principal con datos de ejemplo](docs/principal.png)
+![Pantalla principal con datos de ejemplo](finanzas-local/docs/principal.png)
 
 *Datos de ejemplo generados con `tools/demo_web.py`.*
 
