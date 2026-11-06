@@ -258,3 +258,13 @@ def test_picked_date_uses_local_day(monkeypatch):
         monkeypatch.delenv("TZ")
         _time.tzset()
     assert os.environ.get("TZ") is None
+
+
+def test_refresh_ignores_controls_not_yet_on_screen():
+    """Editar un gasto con ítems fallaba: Flet 1.0 lanza error al leer `.page` antes de tiempo."""
+    import flet as ft
+    from finanzas.ui.app import _refresh
+    column = ft.Column()
+    with pytest.raises(RuntimeError):
+        column.page
+    _refresh(column)
