@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finanzas-local"
+version = "0.2.0"
+description = "Finanzas personales local-first en SQLite con sincronización selectiva a Google Drive"
+requires-python = ">=3.10"
+# `flet build apk` instala exactamente esta lista dentro del APK.
+dependencies = [
+    "flet==1.0.5",
+    "flet-charts==1.0.5",
+    "bcrypt>=4.1",
+    "google-api-python-client>=2.100",
+    "google-auth>=2.23",
+    "google-auth-oauthlib>=1.1",
+    "keyring>=24",
+    "platformdirs>=4",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# Ventana de escritorio para `python src/main.py` y herramientas de desarrollo.
+desktop = ["flet[all]==1.0.5"]
+dev = ["flet[all]==1.0.5", "pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"finanzas.models" = ["schema.sql", "migrations/*.sql"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+
+# ------------------------------------------------------------------ flet build
+[tool.flet]
+product = "Finanzas Local"
+org = "co.finanzaslocal"
+company = "Finanzas Local"
+
+[tool.flet.app]
+path = "src"
+module = "main"
+
+[tool.flet.android]
+bundle_id = "co.finanzaslocal.app"
