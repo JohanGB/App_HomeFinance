@@ -103,6 +103,7 @@ def test_only_the_narrow_scope_is_requested():
 # ------------------------------------------------------------ flujo de dispositivo
 from finanzas.services.drive_auth import (  # noqa: E402
     AuthError,
+    AuthOfflineError,
     DeviceFlow,
     FileTokenStore,
     MissingClientSecret,
@@ -215,3 +216,36 @@ def test_find_and_read_client_secret(tmp_path, monkeypatch, secrets):
         find_client_secret("device")
     (tmp_path / "secrets" / "client_secret_tv.json").write_text(secrets.read_text())
     assert read_client(find_client_secret("device"))["client_id"] == "id"
+
+
+def test_device_flow_survives_network_loss_while_polling():
+    """Android corta la red de la app en segundo plano mientras el usuario aprueba."""
+    store = MemoryStore()
+    replies = [START, AuthOfflineError("Failed to resolve 'oauth2.googleapis.com'"),
+               AuthOfflineError("sin red"),
+               (200, {"access_token": "a", "refresh_token": "r", "expires_in": 3600})]
+
+    def post(url, data):
+        reply = replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    clock = Clock()
+    flow = DeviceFlow(CONFIG, store, post=post, clock=clock, sleep=clock.sleep)
+    assert flow.wait(flow.start()).refresh_token == "r" and store.token == "r"
+
+
+def test_device_flow_without_network_until_expiry_reports_expired():
+    clock = Clock()
+    calls = {"n": 0}
+
+    def post(url, data):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return (200, {**START[1], "expires_in": 20})
+        raise AuthOfflineError("sin red")
+
+    flow = DeviceFlow(CONFIG, MemoryStore(), post=post, clock=clock, sleep=clock.sleep)
+    with pytest.raises(AuthError, match="venció"):
+        flow.wait(flow.start())

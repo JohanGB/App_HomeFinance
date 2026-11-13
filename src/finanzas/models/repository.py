@@ -150,10 +150,11 @@ class Repository:
             rows = conn.execute(_MONTHLY_SQL, period_range(f"{int(year):04d}")).fetchall()
         return [Total(r["clave"], str(r["clave"]), r["total_cent"], r["transacciones"]) for r in rows]
 
-    def totals_by(self, dimension: str, period: str, top: int = 8) -> list[Total]:
+    def totals_by(self, dimension: str, period: str, top: int | None = 8) -> list[Total]:
         """Totales por categoría, lugar o producto en un mes ('YYYY-MM') o año ('YYYY').
 
-        Ordenados de mayor a menor. Lo que pase de `top` se suma en "Otros".
+        Ordenados de mayor a menor. Lo que pase de `top` se suma en "Otros";
+        con `top=None` se devuelven todos.
         """
         if dimension not in DIMENSIONS:
             raise ValidationError(f"Dimensión desconocida: {dimension!r}")
@@ -169,7 +170,7 @@ class Repository:
             (Total(k, label, cents, count) for k, (label, cents, count) in merged.items()),
             key=lambda t: (-t.total_cent, t.etiqueta.casefold()),
         )
-        if len(totals) > top:
+        if top is not None and len(totals) > top:
             rest = totals[top - 1:]
             totals = totals[: top - 1] + [
                 Total(OTROS, f"{OTROS} ({len(rest)})", sum(t.total_cent for t in rest),

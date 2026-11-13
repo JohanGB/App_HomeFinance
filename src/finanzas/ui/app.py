@@ -17,8 +17,9 @@ import flet_charts as fch
 
 from ..models.database import DatabaseError
 from ..models.entities import Expense, ExpenseInput, ItemInput, ValidationError
+from ..models.repository import OTROS
 from ..services.drive_auth import AuthError, AuthOfflineError, MissingClientSecret
-from ..services.drive_gateway import DriveError, RemoteFile
+from ..services.drive_gateway import DriveError, OfflineError, RemoteFile
 from ..services.sync_engine import Resolution, SyncResult, SyncStatus
 from . import formatting as fmt
 from .controller import ANALYSIS_VIEWS, PAGE_SIZE, Analysis, AppController, describe_sync
@@ -65,7 +66,7 @@ class FinanzasApp:
     # ================================================================ arranque
     async def start(self) -> None:
         page = self.page
-        page.title = "Finanzas Local"
+        page.title = "MyCents"
         page.theme = ft.Theme(color_scheme_seed=SEED)
         page.dark_theme = ft.Theme(color_scheme_seed=SEED)
         page.theme_mode = ft.ThemeMode.SYSTEM
@@ -125,7 +126,7 @@ class FinanzasApp:
             actions.append(ft.TextButton("Seguir sin conexión", on_click=self.on_offline))
         self.show_center(
             ft.Icon(ft.Icons.SAVINGS_OUTLINED, size=56, color=SEED),
-            "Finanzas Local",
+            "MyCents",
             message or "Tus datos viven en este equipo. Drive guarda una copia de cada entorno.",
             actions,
         )
@@ -237,7 +238,7 @@ class FinanzasApp:
         self.update_status_icons()
 
         self.page.appbar = ft.AppBar(
-            title=ft.Text("Finanzas"),
+            title=ft.Text("MyCents", weight=ft.FontWeight.W_600),
             actions=[
                 self.sync_button,
                 self.lock_button,
@@ -396,7 +397,7 @@ class FinanzasApp:
         self.chart_box.content = self.scatter(result, year)
 
     def scatter(self, result: Analysis, year: int) -> ft.Control:
-        """Un punto por día (o por mes) con el total consolidado de ese periodo."""
+        """Puntos con el total de cada día (o mes) unidos por una línea, en orden."""
         daily = result.view == "dia"
         top = max(t.total_cent for t in result.totals) / 100
         step = _nice_step(top / 4)
@@ -410,17 +411,22 @@ class FinanzasApp:
             count = f"\n{t.transacciones} gasto{'s' if t.transacciones != 1 else ''}"
             return f"{when}\n{fmt.format_money(t.total_cent)}{count}"
 
-        spots = [
-            fch.ScatterChartSpot(
-                x=t.clave, y=t.total_cent / 100, radius=6,
-                color=ft.Colors.with_opacity(0.8, SEED),
-                tooltip=fch.ScatterChartSpotTooltip(
-                    text=tooltip(t),
-                    text_style=ft.TextStyle(color=ft.Colors.ON_INVERSE_SURFACE, size=12),
-                ),
-            )
-            for t in result.totals
-        ]
+        series = fch.LineChartData(
+            points=[
+                fch.LineChartDataPoint(
+                    x=t.clave, y=t.total_cent / 100,
+                    tooltip=fch.LineChartDataPointTooltip(
+                        text=tooltip(t),
+                        text_style=ft.TextStyle(color=ft.Colors.ON_INVERSE_SURFACE, size=12),
+                    ),
+                )
+                for t in result.totals
+            ],
+            color=ft.Colors.with_opacity(0.55, SEED),
+            stroke_width=2,
+            curved=False,
+            point=fch.ChartCirclePoint(radius=3.5, color=SEED, stroke_width=0),
+        )
         if daily:
             days = fmt.days_in_month(result.period)
             min_x, max_x = 0, days + 1
@@ -428,10 +434,10 @@ class FinanzasApp:
         else:
             min_x, max_x = 0.5, 12.5
             bottom = [(m, fmt.MONTH_INITIALS[m - 1]) for m in range(1, 13)]
-        return fch.ScatterChart(
-            spots=spots,
+        return fch.LineChart(
+            data_series=[series],
             # Colores del tema invertido: claro sobre oscuro en modo claro y al revés.
-            tooltip=fch.ScatterChartTooltip(bgcolor=ft.Colors.INVERSE_SURFACE, border_radius=8),
+            tooltip=fch.LineChartTooltip(bgcolor=ft.Colors.INVERSE_SURFACE, border_radius=8),
             min_x=min_x, max_x=max_x, min_y=0, max_y=max_y,
             horizontal_grid_lines=fch.ChartGridLines(
                 interval=step, color=ft.Colors.with_opacity(0.12, ft.Colors.ON_SURFACE), width=1
@@ -452,37 +458,69 @@ class FinanzasApp:
             expand=True,
         )
 
+    @staticmethod
+    def bar_row(t, top: int, grand: int, trailing: ft.Control | None = None) -> ft.Control:
+        share = 100 * t.total_cent / grand if grand else 0
+        count = f"{share:.0f} % · {t.transacciones} gasto{'s' if t.transacciones != 1 else ''}"
+        return ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Text(t.etiqueta, expand=True, max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS),
+                        ft.Text(fmt.format_money(t.total_cent), weight=ft.FontWeight.W_600),
+                    ]
+                ),
+                ft.ProgressBar(value=t.total_cent / top if top else 0, color=SEED,
+                               bgcolor=ft.Colors.with_opacity(0.08, SEED),
+                               bar_height=10, border_radius=5),
+                ft.Row(
+                    [ft.Text(count, size=11, color=ft.Colors.ON_SURFACE_VARIANT, expand=True),
+                     *([trailing] if trailing else [])],
+                ),
+            ],
+            spacing=3,
+        )
+
     def bars(self, result: Analysis) -> ft.Control:
         """Barras horizontales: los nombres largos se leen completos en un teléfono."""
         grand = sum(t.total_cent for t in result.totals)
         top = max(t.total_cent for t in result.totals)
         rows: list[ft.Control] = []
         for t in result.totals:
-            share = 100 * t.total_cent / grand if grand else 0
-            rows.append(
-                ft.Column(
-                    [
-                        ft.Row(
-                            [
-                                ft.Text(t.etiqueta, expand=True, max_lines=1,
-                                        overflow=ft.TextOverflow.ELLIPSIS),
-                                ft.Text(fmt.format_money(t.total_cent), weight=ft.FontWeight.W_600),
-                            ]
-                        ),
-                        ft.ProgressBar(value=t.total_cent / top if top else 0, color=SEED,
-                                       bgcolor=ft.Colors.with_opacity(0.08, SEED),
-                                       bar_height=10, border_radius=5),
-                        ft.Text(f"{share:.0f} % · {t.transacciones} gasto"
-                                f"{'s' if t.transacciones != 1 else ''}",
-                                size=11, color=ft.Colors.ON_SURFACE_VARIANT),
-                    ],
-                    spacing=3,
+            if t.clave == OTROS and result.others:
+                rows.append(
+                    ft.Container(
+                        self.bar_row(t, top, grand, ft.Text("Ver detalle ›", size=12, color=SEED,
+                                                            weight=ft.FontWeight.W_600)),
+                        on_click=lambda e, r=result, g=grand: self.show_others(r, g),
+                        ink=True, border_radius=8,
+                        tooltip="Ver qué incluye",
+                    )
                 )
-            )
+            else:
+                rows.append(self.bar_row(t, top, grand))
         if result.view == "producto":
             rows.append(ft.Text("Solo suma lo registrado como ítems.", size=11, italic=True,
                                 color=ft.Colors.ON_SURFACE_VARIANT))
         return ft.Column(rows, spacing=12)
+
+    def show_others(self, result: Analysis, grand: int) -> None:
+        """Detalle de la barra "Otros". El porcentaje sigue siendo sobre el total del periodo."""
+        top = max(t.total_cent for t in result.others)
+        period = f"año {result.period}" if len(result.period) == 4 else fmt.month_label(result.period)
+        self.page.show_dialog(
+            ft.AlertDialog(
+                title=ft.Text(f"Otros · {period}"),
+                content=ft.Container(
+                    ft.Column([self.bar_row(t, top, grand) for t in result.others],
+                              spacing=12, tight=True),
+                    width=420,
+                ),
+                scrollable=True,
+                actions=[ft.TextButton("Cerrar", on_click=lambda e: self.page.pop_dialog())],
+            )
+        )
 
     # --------------------------------------------------------------- historial
     def render_list(self, expenses: list[Expense]) -> None:
@@ -1033,11 +1071,12 @@ class FinanzasApp:
         try:
             return True, await asyncio.to_thread(fn, *args)
         except EXPECTED_ERRORS as exc:
+            message = user_message(exc)
             if show_error is not None:
-                show_error.error = str(exc)
+                show_error.error = message
                 self.page.update()
             elif not quiet:
-                self.toast(str(exc))
+                self.toast(message)
             return False, None
 
     async def confirm(self, title: str, text: str) -> bool:
@@ -1088,6 +1127,20 @@ class FinanzasApp:
                         expand=True)
         )
         self.page.update()
+
+
+OFFLINE_MESSAGE = (
+    "Sin conexión con Google. Revisa que el equipo tenga internet e intenta de nuevo. "
+    "Mientras tanto, la app sigue funcionando con los datos guardados aquí."
+)
+
+
+def user_message(exc: Exception) -> str:
+    """Texto para el usuario. Los errores de red de las librerías llegan en inglés y
+    con detalles técnicos (DNS, puertos); aquí se resumen en una frase."""
+    if isinstance(exc, (AuthOfflineError, OfflineError)):
+        return OFFLINE_MESSAGE
+    return str(exc)
 
 
 def _refresh(control: ft.Control) -> None:

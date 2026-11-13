@@ -72,8 +72,23 @@ def test_list_filters_extension_in_python_and_paginates():
 
 
 def test_ensure_folder_reuses_existing():
-    gw, http = gateway((200, {"files": [{"id": "abc"}]}))
+    gw, http = gateway((200, {"files": [{"id": "abc", "name": "MyCents"}]}))
     assert gw.ensure_app_folder() == "abc"
+    assert len(http.requests) == 1
+
+
+def test_ensure_folder_renames_legacy_folder_keeping_its_id():
+    gw, http = gateway((200, {"files": [{"id": "old", "name": "Finanzas Local"}]}), (200, {"id": "old"}))
+    assert gw.ensure_app_folder() == "old"
+    assert "Finanzas Local" in http.query(0)["q"][0] and "MyCents" in http.query(0)["q"][0]
+    assert http.requests[1]["method"] == "PATCH"
+    assert json.loads(http.requests[1]["body"]) == {"name": "MyCents"}
+
+
+def test_ensure_folder_prefers_new_name_when_both_exist():
+    gw, http = gateway((200, {"files": [{"id": "old", "name": "Finanzas Local"},
+                                        {"id": "new", "name": "MyCents"}]}))
+    assert gw.ensure_app_folder() == "new"
     assert len(http.requests) == 1
 
 

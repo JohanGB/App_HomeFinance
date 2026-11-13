@@ -97,6 +97,7 @@ class ActiveEnvironment:
 
 
 def default_data_dir() -> Path:
+    # Carpeta interna con el nombre anterior: contiene las copias locales y el estado.
     return user_data_path("FinanzasLocal", appauthor=False)
 
 
@@ -111,11 +112,15 @@ class SyncEngine:
         self.state = LocalState(self.data_dir / "estado.json")
         self.active: ActiveEnvironment | None = None
         self._generation = 0
+        self._folder_ready = False
 
     # ---------------------------------------------------------------- catálogo
     def folder(self) -> str:
-        if not self.state.folder_id:
+        # Se consulta una vez por ejecución (no solo la primera vez en el equipo) para
+        # que el cambio de nombre de la carpeta llegue también a equipos ya configurados.
+        if not self._folder_ready:
             self.state.folder_id = self.gateway.ensure_app_folder()
+            self._folder_ready = True
         return self.state.folder_id
 
     def list_environments(self) -> list[RemoteFile]:

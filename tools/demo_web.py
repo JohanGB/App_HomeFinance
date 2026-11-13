@@ -27,6 +27,8 @@ from test_sync import FakeDrive  # noqa: E402
 PLACES = {
     "Éxito": "Mercado", "D1": "Mercado", "Ara": "Mercado", "Tienda de la esquina": "Mercado",
     "Juan Valdez": "Restaurantes", "Uber": "Transporte", "Farmatodo": "Salud",
+    "Crepes & Waffles": "Restaurantes", "Cine Colombia": "Ocio", "Homecenter": "Hogar",
+    "Panamericana": "Educación", "Terpel": "Transporte", "Cruz Verde": "Salud",
 }
 
 

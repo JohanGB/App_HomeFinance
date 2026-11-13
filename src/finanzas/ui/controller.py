@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..models.entities import BudgetStatus, Expense, ExpenseInput, Total
+from ..models.repository import OTROS
 from ..models.security import EditSession
 from ..services import drive_auth
 from ..services.drive_gateway import (
@@ -93,6 +94,25 @@ class Analysis:
     period: str          # 'YYYY-MM' o 'YYYY'
     kind: str            # 'scatter' o 'bars'
     totals: list[Total]
+    others: list[Total] = field(default_factory=list)  # lo que suma la barra "Otros"
+
+
+BAR_TOP = 8
+
+
+def split_top(totals: list[Total], top: int = BAR_TOP) -> tuple[list[Total], list[Total]]:
+    """Las primeras `top - 1` barras, más una barra "Otros" que suma el resto.
+
+    Devuelve también el resto por separado, para poder mostrar su detalle.
+    """
+    if len(totals) <= top:
+        return totals, []
+    head, rest = totals[: top - 1], totals[top - 1:]
+    others = Total(
+        OTROS, f"{OTROS} ({len(rest)})",
+        sum(t.total_cent for t in rest), sum(t.transacciones for t in rest),
+    )
+    return head + [others], rest
 
 
 @dataclass
@@ -266,7 +286,8 @@ class AppController:
         if view == "mes":
             return Analysis(env.generation, view, year, "scatter", env.repo.monthly_totals(year))
         period = year if scope == "anio" else mes
-        return Analysis(env.generation, view, period, "bars", env.repo.totals_by(view, period))
+        shown, others = split_top(env.repo.totals_by(view, period, top=None))
+        return Analysis(env.generation, view, period, "bars", shown, others)
 
     def suggest_categories(self, prefix: str = "") -> list[str]:
         env = self.env

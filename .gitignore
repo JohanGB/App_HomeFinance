@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Datos y secretos: nunca al repositorio
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.bak
+client_secret*.json
+token*.json
+src/secrets/*.json
+storage/

@@ -25,7 +25,9 @@ from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 FOLDER_MIME = "application/vnd.google-apps.folder"
 SQLITE_MIME = "application/vnd.sqlite3"
-APP_FOLDER_NAME = "Finanzas Local"
+APP_FOLDER_NAME = "MyCents"
+# Nombre anterior de la carpeta. Se renombra la primera vez que la app la encuentra.
+LEGACY_FOLDER_NAMES = ("Finanzas Local",)
 ENV_PROPERTY = "finanzas_entorno_id"
 
 CHUNK_BYTES = 1024 * 1024
@@ -158,15 +160,26 @@ class GoogleDriveGateway:
             raise _translate(exc) from exc
 
     def ensure_app_folder(self) -> str:
+        """Carpeta de la app en la raíz de Drive. Si aún tiene el nombre anterior, la
+        renombra: así no cambian los ids de los archivos y ningún entorno se pierde."""
+        names = " or ".join(
+            f"name = '{escape_query(n)}'" for n in (APP_FOLDER_NAME, *LEGACY_FOLDER_NAMES)
+        )
         query = (
-            f"name = '{escape_query(APP_FOLDER_NAME)}' and mimeType = '{FOLDER_MIME}' "
-            "and 'root' in parents and trashed = false"
+            f"({names}) and mimeType = '{FOLDER_MIME}' and 'root' in parents and trashed = false"
         )
         found = self._run(
-            self._files.list(q=query, spaces="drive", fields="files(id)", pageSize=1)
+            self._files.list(q=query, spaces="drive", fields="files(id,name)", pageSize=10)
         ).get("files", [])
+        current = [f for f in found if f.get("name") == APP_FOLDER_NAME]
+        if current:
+            return current[0]["id"]
         if found:
-            return found[0]["id"]
+            legacy_id = found[0]["id"]
+            self._run(
+                self._files.update(fileId=legacy_id, body={"name": APP_FOLDER_NAME}, fields="id")
+            )
+            return legacy_id
         return self._run(
             self._files.create(
                 body={"name": APP_FOLDER_NAME, "mimeType": FOLDER_MIME, "parents": ["root"]},

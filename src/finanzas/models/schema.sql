@@ -1,4 +1,4 @@
--- Finanzas Local · esquema v1 (se aplica sobre PRAGMA user_version = 0).
+-- MyCents · esquema v1 (se aplica sobre PRAGMA user_version = 0).
 -- Requiere SQLite 3.24+ (UPSERT) con JSON1.
 --
 -- Convenciones

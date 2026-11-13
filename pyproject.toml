@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "finanzas-local"
-version = "0.2.0"
-description = "Finanzas personales local-first en SQLite con sincronización selectiva a Google Drive"
+name = "mycents"
+version = "0.3.0"
+description = "MyCents: finanzas personales local-first en SQLite con sincronización selectiva a Google Drive"
 requires-python = ">=3.10"
 # `flet build apk` instala exactamente esta lista dentro del APK.
 dependencies = [
@@ -37,13 +37,15 @@ testpaths = ["tests"]
 
 # ------------------------------------------------------------------ flet build
 [tool.flet]
-product = "Finanzas Local"
+product = "MyCents"
 org = "co.finanzaslocal"
-company = "Finanzas Local"
+company = "MyCents"
 
 [tool.flet.app]
 path = "src"
 module = "main"
 
 [tool.flet.android]
+# Se conserva el id del paquete anterior: así el APK nuevo actualiza la app instalada
+# en vez de instalarse aparte, y conserva la sesión y las copias locales.
 bundle_id = "co.finanzaslocal.app"

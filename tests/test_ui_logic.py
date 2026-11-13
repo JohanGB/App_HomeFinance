@@ -268,3 +268,32 @@ def test_refresh_ignores_controls_not_yet_on_screen():
     with pytest.raises(RuntimeError):
         column.page
     _refresh(column)
+
+
+def test_network_errors_become_a_spanish_sentence():
+    from finanzas.services.drive_auth import AuthOfflineError
+    from finanzas.services.drive_gateway import OfflineError
+    from finanzas.ui.app import OFFLINE_MESSAGE, user_message
+    raw = ("HTTPSConnectionPool(host='oauth2.googleapis.com', port=443): Max retries exceeded "
+           "(Caused by NameResolutionError ... [Errno 7] No address associated with hostname)")
+    assert user_message(AuthOfflineError(raw)) == OFFLINE_MESSAGE
+    assert user_message(OfflineError("timed out")) == OFFLINE_MESSAGE
+    assert user_message(ValidationError("Escribe un valor.")) == "Escribe un valor."
+
+
+def test_bars_keep_detail_of_others(ctrl):
+    for i in range(12):
+        ctrl.add_expense(ExpenseInput(str(1000 + i * 100), f"Lugar {i:02d}", ocurrido_en="2026-11-02"))
+    result = ctrl.analysis("lugar", "2026-11")
+    assert len(result.totals) == 8 and result.totals[-1].etiqueta == "Otros (5)"
+    assert [t.etiqueta for t in result.others] == [f"Lugar {i:02d}" for i in (4, 3, 2, 1, 0)]
+    assert result.totals[-1].total_cent == sum(t.total_cent for t in result.others)
+    few = ctrl.analysis("categoria", "2026-11")
+    assert few.others == []
+
+
+def test_split_top_without_overflow():
+    from finanzas.models.entities import Total
+    from finanzas.ui.controller import split_top
+    totals = [Total(str(i), str(i), 100 - i, 1) for i in range(8)]
+    assert split_top(totals) == (totals, [])

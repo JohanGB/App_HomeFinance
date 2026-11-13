@@ -40,6 +40,8 @@ DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 DESKTOP_SECRET = "client_secret.json"
 DEVICE_SECRET = "client_secret_tv.json"
 
+# Identificadores internos con el nombre anterior: cambiarlos obligaría a iniciar sesión
+# otra vez y dejaría huérfanas las copias locales. El usuario nunca los ve.
 _KEYRING_SERVICE = "finanzas-local"
 PICK_TIMEOUT_SECONDS = 300
 
@@ -223,7 +225,7 @@ def desktop_login(secret_path: Path, store: TokenStore) -> Credentials:
     credentials = flow.run_local_server(
         port=0,
         open_browser=True,
-        success_message="Listo. Ya puedes volver a Finanzas Local.",
+        success_message="Listo. Ya puedes volver a MyCents.",
     )
     if credentials.refresh_token:
         store.save(credentials.refresh_token)
@@ -305,15 +307,21 @@ class DeviceFlow:
             if cancelled is not None and cancelled.is_set():
                 raise AuthError("Inicio de sesión cancelado.")
             self.sleep(interval)
-            status, body = self._post(
-                self.config.get("token_uri", TOKEN_URI),
-                {
-                    "client_id": self.config["client_id"],
-                    "client_secret": self.config["client_secret"],
-                    "device_code": code.device_code,
-                    "grant_type": DEVICE_GRANT,
-                },
-            )
+            try:
+                status, body = self._post(
+                    self.config.get("token_uri", TOKEN_URI),
+                    {
+                        "client_id": self.config["client_id"],
+                        "client_secret": self.config["client_secret"],
+                        "device_code": code.device_code,
+                        "grant_type": DEVICE_GRANT,
+                    },
+                )
+            except AuthOfflineError:
+                # Mientras apruebas en el navegador, Android puede cortarle la red a la app
+                # en segundo plano (Ahorro de datos). Se sigue intentando hasta que vuelva
+                # o venza el código.
+                continue
             if status == 200 and body.get("access_token"):
                 if not body.get("refresh_token"):
                     raise AuthError("Google no entregó un token de renovación.")
@@ -340,7 +348,7 @@ class _RedirectHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
-        self.wfile.write("Listo. Ya puedes volver a Finanzas Local.".encode("utf-8"))
+        self.wfile.write("Listo. Ya puedes volver a MyCents.".encode("utf-8"))
 
     def log_message(self, *args) -> None:
         pass

@@ -1,5 +1,8 @@
-[README.md](https://github.com/user-attachments/files/34455745/README.md)
-# Finanzas Local
+# MyCents
+
+**Español** · [English](README.en.md)
+
+![pruebas](https://github.com/JohanGB/App_HomeFinance/actions/workflows/pruebas.yml/badge.svg) ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB) ![Licencia](https://img.shields.io/badge/licencia-MIT-green)
 
 Finanzas personales local-first. Cada entorno es un archivo SQLite que vive en tu
 equipo; Google Drive solo recibe una copia al cambiar de entorno o al cerrar la app.
@@ -8,16 +11,16 @@ equipo; Google Drive solo recibe una copia al cambiar de entorno o al cerrar la 
 Windows y la sincronización se probaron contra Google Drive real; Android todavía no se
 ha probado en un teléfono.
 
-![Pantalla principal con datos de ejemplo](finanzas-local/docs/principal.png)
+![Pantalla principal con datos de ejemplo](docs/principal.png)
 
 *Datos de ejemplo generados con `tools/demo_web.py`.*
 
 ## Arquitectura MVC
 
 ```
-finanzas-local/
+mycents/
 ├── pyproject.toml              Dependencias y configuración de `flet build`
-├── Finanzas.bat                Abre la app en Windows sin consola
+├── MyCents.bat                 Abre la app en Windows sin consola
 ├── src/
 │   ├── main.py                 Punto de entrada (Windows y Android)
 │   ├── secrets/                JSON de Google Cloud; viajan dentro del APK
@@ -79,11 +82,12 @@ responde totales por día, mes, lugar o categoría sin tocar la tabla.
 
 | Vista | Gráfica | Periodo |
 | --- | --- | --- |
-| Total por día | Dispersión: un punto por día con el total consolidado | Mes elegido |
-| Total por mes | Dispersión: un punto por mes | Año del mes elegido |
+| Total por día | Un punto por día con el total consolidado, unidos por una línea | Mes elegido |
+| Total por mes | Un punto por mes, unidos por una línea | Año del mes elegido |
 | Por categoría · lugar · producto | Barras horizontales, de mayor a menor, con % del total | Mes o año |
 
-Las barras muestran las 7 primeras y suman el resto en "Otros". "Por producto" solo cuenta
+Las barras muestran las 7 primeras y suman el resto en "Otros"; al tocar esa barra se ve
+su detalle. "Por producto" solo cuenta
 lo registrado como ítems. Los nombres se agrupan sin tildes ni mayúsculas ("Café" y "cafe"
 son lo mismo).
 
@@ -121,7 +125,7 @@ y cada sesión terminaría en conflicto. Si no hay red, la app sigue con la copi
 `integrity_check`, `foreign_key_check` y `entorno_id`, y solo entonces reemplaza al
 actual. Una descarga dañada no toca los datos.
 
-**`drive.file` como único permiso.** La app crea la carpeta `Finanzas Local` y lista su
+**`drive.file` como único permiso.** La app crea la carpeta `MyCents` y lista su
 contenido. Un `.db` subido a mano se entrega una vez con el selector de Google
 (`pick_drive_files` + `link_picked_file`). El refresh token va en el almacén de
 credenciales del sistema, no en un `token.json`.
@@ -150,7 +154,7 @@ datos adicionales antes de permitirlo.
 python -m venv .venv
 .venv\Scripts\activate
 pip install -e ".[dev]"
-python src/main.py          # o doble clic en Finanzas.bat
+python src/main.py          # o doble clic en MyCents.bat
 ```
 
 **Android** (se compila desde Windows; la primera vez descarga Flutter, JDK y Android SDK)
@@ -211,6 +215,15 @@ ocuparían unos 2 MB, que es lo que se sube en cada sincronización.
 - **Un `.db` abierto por equipo.** La sincronización reemplaza el archivo completo, por
   lo que no combina cambios simultáneos de dos personas.
 
+## Nombre anterior
+
+La app se llamó **Finanzas Local** hasta la versión 0.2. Al abrirse, la versión 0.3
+renombra la carpeta de Drive `Finanzas Local` a `MyCents` sin cambiar su id, así que
+ningún entorno se pierde. Por compatibilidad se conservan tres identificadores que el
+usuario no ve: el paquete de Android (`co.finanzaslocal.app`, para que el APK nuevo
+actualice al anterior), la carpeta local de datos (`FinanzasLocal`) y la entrada del
+Administrador de credenciales (`finanzas-local`).
+
 ## Pruebas
 
 ```bash
@@ -218,4 +231,4 @@ pip install -e ".[dev]"
 pytest
 ```
 
-185 pruebas en Python 3.13 con SQLite 3.53 (la capa de datos también en 3.10).
+195 pruebas en Python 3.13 con SQLite 3.53 (la capa de datos también en 3.10).
