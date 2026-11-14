@@ -1,6 +1,6 @@
 # MyCents
 
-**Español** · [English](README.en.md)
+**Español** · [English](README.en.md) · [Ficha en el portafolio](https://johangb.github.io/proyectos/mycents.html)
 
 ![pruebas](https://github.com/JohanGB/App_HomeFinance/actions/workflows/pruebas.yml/badge.svg) ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB) ![Licencia](https://img.shields.io/badge/licencia-MIT-green)
 

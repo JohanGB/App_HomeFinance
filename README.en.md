@@ -1,6 +1,8 @@
 # MyCents
 
-[Español](README.md) · **English**
+[Español](README.md) · **English** · [Portfolio page](https://johangb.github.io/en/projects/mycents.html)
+
+![tests](https://github.com/JohanGB/App_HomeFinance/actions/workflows/pruebas.yml/badge.svg) ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB) ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Local-first personal finance.** Each environment is a SQLite file that lives on your device;
 Google Drive only receives a copy when you switch environments or close the app.
